@@ -1,0 +1,4 @@
+"0","orquideas <-"
+"0","  orquideas %>%"
+"0","  mutate(coordinateUncertaintyInMeters = as.numeric(coordinateUncertaintyInMeters)) %>%"
+"0","  mutate(eventDate = as.Date(eventDate, ""%Y-%m-%d""))"

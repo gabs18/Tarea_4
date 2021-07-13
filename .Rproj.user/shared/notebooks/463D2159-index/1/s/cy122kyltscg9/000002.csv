@@ -1,0 +1,7 @@
+"0","ASP <- ASP %>%"
+"0","  filter(descripcio!=""Area Marina de Manejo"" & descripcio!=""Area marina protegida"")"
+"0",""
+"0","cat(""Cantidad de registros después de descartar las áreas marinas: "", nrow(ASP))"
+"1","Cantidad de registros después de descartar las áreas marinas: "
+"1"," "
+"1","148"

@@ -1,0 +1,174 @@
+---
+title: 'Tarea 4 - Curso: GF0604'
+subtitle: "Procesamiento y visualización de datos espaciales: orquídeas"
+author: "Estudiante: Gabriela Becerra Sandoval (C01067)"
+date: "Fecha de entrega: 15/7/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<br>
+
+
+### Introducción
+Este trabajo pretende mostrar la cantidad de registros de orquídeas por área silvestre protegida de Costa Rica.
+
+<br>
+
+### 1. Carga de paquetes
+```{r, warning=FALSE, message=FALSE}
+library(sf)
+library(leaflet)
+library(leaflet.extras)
+library(leafem)
+library(dplyr)
+library(DT)
+```
+
+<br>
+ 
+### 2. Carga de datos
+Dentro de las opciones de la carga de datos de orquídeas se especifican las columnas a las cuales corresponden la longitud y latitud, puesto que el archivo es un csv.
+```{r, carga-datos, message=FALSE, warning=FALSE}
+# Carga de los datos de orquideas
+orquideas <-
+  st_read(
+    "https://raw.githubusercontent.com/gf0604-procesamientodatosgeograficos/2021i-datos/main/gbif/orchidaceae-cr-registros.csv",
+    options = c(
+      "X_POSSIBLE_NAMES=decimalLongitude",
+      "Y_POSSIBLE_NAMES=decimalLatitude"
+    ),
+    quiet = TRUE
+  )
+
+
+# Carga de la capa de áreas silvestres protegidas
+ASP <-
+  st_read(
+    "https://raw.githubusercontent.com/gf0604-procesamientodatosgeograficos/2021i-datos/main/sinac/asp/asp-wgs84.geojson",
+    quiet = TRUE
+  )
+```
+
+```{r message=FALSE, warning=FALSE}
+# Asignación del sistema de coordenadas
+st_crs(orquideas) = 4326
+st_crs(ASP) = 4326
+```
+
+
+<br>
+
+### 3. Limpieza de datos
+
+#### a. Limpiar
+```{r change_data_type}
+# Omisión de celdas vacías
+orquideas$species[orquideas$species == ""] <- "orquideas"
+
+# Cambio de tipo de dato
+orquideas <-
+  orquideas %>%
+  mutate(coordinateUncertaintyInMeters = as.numeric(coordinateUncertaintyInMeters)) %>%
+  mutate(eventDate = as.Date(eventDate, "%Y-%m-%d"))
+```
+
+<br>
+
+#### b. Selección de registros
+En esta etapa se descartan los registros con un valor mayor que 1000 y aquellos con valor vacío o NA en el campo _species_.    
+Primero, se muestra la cantidad original de registros.
+```{r, tidy_data, warning=FALSE}
+cat("Cantidad original de registros: ", nrow(orquideas))
+```
+
+
+Luego, se filtran los datos.
+``` {r}
+# Filtración de datos
+orquideas <- orquideas %>%
+  filter(!is.na(coordinateUncertaintyInMeters) & coordinateUncertaintyInMeters <= 1000)%>%
+  filter(species!="orquideas")
+
+cat("Cantidad de registros después de descartar los de alta incertidumbre en la ubicación: ", nrow(orquideas))
+```
+
+Seguidamente, se repite el mismo proceso para las áreas silvestres protegidas
+``` {r, tidy_data_ASP, warning=FALSE}
+cat("Cantidad original de registros de ASP: ", nrow(ASP))
+```
+ 
+``` {r}
+# Filtración de datos
+ASP <- ASP %>%
+  filter(descripcio!="Area Marina de Manejo" & descripcio!="Area marina protegida")
+
+cat("Cantidad de registros después de descartar las áreas marinas: ", nrow(ASP))
+``` 
+<br>
+
+#### c. Creación de conjunto de datos con la cantidad de registros por ASP
+``` {r, message=FALSE, warning=FALSE}
+# Utilización de st_join()
+ASP_registros <-
+  ASP %>%
+  st_make_valid() %>%
+  st_join(orquideas) %>%
+  group_by(nombre_asp) %>%
+  summarize(especies = n())
+
+# Asignación de sistema de coordenadas
+st_crs(ASP_registros) = 4326
+```
+
+
+
+<br>
+
+### 4. Creación del mapa leaflet
+``` {r, message=FALSE, warning=FALSE}
+# Creación de paletas de colores morados
+pal_especies <-
+  colorNumeric(palette = "RdPu",
+               domain = ASP_registros$especies,
+               na.color = "transparent")
+```
+
+```{r map, fig.width=9.5, message=FALSE, warning=FALSE}
+# Mapa
+leaflet() %>%
+  setView(lng = -84.0, lat = 10.0, zoom = 7) %>%
+  addProviderTiles(providers$CartoDB.Positron, group = "Grey Open Street Map") %>%
+  addPolygons(
+    data = ASP_registros,
+    fillColor = ~ pal_especies (ASP_registros$especies),
+    fillOpacity = 0.9,
+    stroke = TRUE,
+    color = "black",
+    weight = 1,
+    popup = paste(
+      paste(
+        "<strong>Localidad:</strong>",
+        ASP_registros$nombre_asp
+      ),
+      paste(
+        "<strong>Cantidad de especies de orquídeas:</strong>",
+        ASP_registros$especies
+        
+      ),
+      sep = '<br/>'
+    ),
+    group = "Localidad y especies"
+  ) %>%
+  addLayersControl(baseGroups = c("Grey Open Street Map"),
+                   overlayGroups = c("Localidad y especies")) %>%
+  addLegend(
+    position = "bottomleft",
+    pal = pal_especies,
+    values = ASP_registros$especies,
+    group = "Localidad y especies",
+    title = "Cantidad de <br> especies de <br> orquídeas")
+```

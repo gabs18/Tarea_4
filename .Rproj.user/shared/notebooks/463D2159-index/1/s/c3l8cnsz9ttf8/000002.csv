@@ -1,0 +1,5 @@
+"0","# Creación de paletas de colores"
+"0","pal_especies <-"
+"0","  colorNumeric(palette = ""RdPu"","
+"0","               domain = ASP_registros$especies,"
+"0","               na.color = ""transparent"")"
